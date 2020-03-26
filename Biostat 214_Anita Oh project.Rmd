@@ -1,0 +1,211 @@
+---
+title: "BIOSTAT 24-Project"
+author: "Annie Oh"
+date: "March 7, 2020"
+bibliography: refs.bib
+output: 
+  
+  pdf_document:
+      toc: true
+  html_document:
+      theme: flatly
+      highlight: tango
+      toc: true
+      toc_depth: 3
+      toc_float: true
+---
+
+## Introduction
+Tobacco smoke is the most common environmental risk factor for chronic obstructive pulmonary disease (COPD). Part of the relationship between tobacco smoke and development of COPD may be related to the toxins in tobacco, which leads to a pro-inflammatory state in individuals. This inflammation leads to airway mucus hypersecretion, bronchial wall thickening, and bronchoconstriction. Biomarkers of inflammation are increased in current and former smokers, and may be increased in those with a higher previous smoking-pack year history and those with poorer lung function based off spirometry.  The identification of inflammatory biomarkers that are related to smokers may lead to early disease prediction and monitoring in the future.
+
+#What we know
+There are current proposed biological makers of COPD which include sputum mucin concentration and plasma fibrinogen, C-reactive protein (CRP), and soluble tumor-necrosis factor (TNF) receptors (sTNFRSF)1A (also known as sTNF-R55), and (sTNFRSF)1B (also known as sTNF-R75). 
+Total sputum mucin concentrations are higher in current or former smokers with COPD, and also in those with more respiratory exacerbations. Elevated plasma fibrinogen has been associated with reduced FEV1, are higher in patients with COPD, and are associated with disease severity and exacerbations. An elevated CRP in smokers has been associated with reduction in FEV1, and is also associated with worse respiratory symptoms measured by CAT scores and chronic bronchitis in SPIROMICS smokers with preserved spirometry. 
+TNF can bind to two receptors, TNF receptor 1 and TNF receptor type 2. Soluble TNF receptors can either inhibit or promote the activity of TNF??, however they serve as sensitive and reliable markers of TNF-?? activity and are considered a pro-inflammatory marker. sTNF-R55 and sTNF-R75 is elevated in those with stable COPD, and are also elevated in those with exacerbations. sTNF-R55 is associated with increased symptom burden measured by CAT scores in SPIROMICS smokers with preserved spirometry. 
+
+#Why we care
+The identification of inflammatory biomarkers that are related to smokers may lead to early disease prediction and monitoring in the future. Using these biomarkers identified above, and the relationship to smoking-pack year history and lung function may help identify those who may be prone to continued worsening of COPD. 
+
+
+
+
+## Methods
+```{r}
+library(rtemis)
+
+#Read in data
+setwd("C:/Users/aoh/Dropbox/TICR/BIOSTAT 214_Advanced R/Final Project")
+RS<-read.csv('Biostat 214 data.csv')
+#Check data
+dim(RS)
+str(RS)
+names(RS)
+checkData(RS)
+
+table(RS$resmoke)
+
+#Visualization
+#CRP
+hist(RS$v1_crp)
+#transform crp
+crp_log<-log(RS$v1_crp)
+hist(crp_log)
+
+#mucin concentration
+hist(RS$mucin_concentration_v1)
+#Transform mucin to logarithm scale 
+mucin_log<-log(RS$mucin_concentration_v1)
+hist(mucin_log)
+
+#Fibrinogen
+hist(RS$v1_fga_fgb_fgg)
+#Transform fibrinogen to logarithm scale
+fibrin_log<-log(RS$v1_fga_fgb_fgg)
+hist(fibrin_log)
+
+#Soluble TNFa-1
+hist(RS$v1_tnfrsf1a)
+#Transform TNFa-1
+tnf1a_log<-log(RS$v1_tnfrsf1a)
+hist(tnf1a_log)
+
+#Soluble TNFb-1
+hist(RS$v1_tnfrsf1b)
+#Transform TNFa-1
+tnf1b_log<-log(RS$v1_tnfrsf1b)
+hist(tnf1b_log)
+
+```
+
+```{r}
+#Heatmap of variables
+RS_matrix<-data.matrix(RS[,c("v1_crp","mucin_concentration_v1","v1_fga_fgb_fgg", "v1_tnfrsf1a", "v1_tnfrsf1b")])
+
+
+```
+
+#heatmap
+```{r}
+mydistfunPearson = function(x) {
+  t.dist = 1 - cor(t(x), use="pairwise")
+  t.limit <- 1.1*max(t.dist,na.rm=TRUE)
+  t.dist[is.na(t.dist)] = t.limit
+  t.dist = as.dist(t.dist)
+  return(t.dist)
+}
+
+mydistfunEuc = function(x) {
+  t.dist = dist(x)
+  t.limit <- 1.1*max(t.dist,na.rm=TRUE)
+  t.dist[is.na(t.dist)] = t.limit
+  return(t.dist)
+}
+
+# EITHER
+# standardize (mean center and scale by standard deviation) the data across each gene, so that genes with high expression don't outweigh genes with low expression
+RS_matrix = t(scale(RS_matrix))
+
+
+# Get max/min 90% of data for the color lookup table that will be used to color the individual blocks of the heatmap. Basically, doing this so outliers don't set the color limits leading to most things in between looking the same.
+x = as.vector(RS_matrix)
+z = (x-mean(x,na.rm=TRUE)) / sd(x,na.rm=TRUE)
+rm.index = which(pnorm(abs(z), lower.tail=FALSE) < 0.05)
+x[rm.index] = NA
+maxvalue = max(x,na.rm=TRUE)
+minvalue = min(x,na.rm=TRUE)
+```
+
+```{r}
+#Finally, use the heatmap.2 function from the gplots package. Change "average" to "complete" for complete linkage, and change mydistfunPearson to mydistfunEuc for Euclidean distance. I find that the two different distance functions highlight different aspects of the data, with the Euclidean distance metric tending to put outlier samples into their own polarized branch.
+library(gplots)
+heatmap.2(RS_matrix,distfun=mydistfunEuc,hclustfun=function(x) hclust(x,method="complete"),cexRow=0.7,breaks=seq(minvalue,maxvalue,length.out=76),col=bluered(75),na.color="grey",offsetRow=0,trace="none",density.info="none")
+
+```
+
+
+```{r}
+#Data Summary
+tapply(X=RS$age_derv_v1, INDEX=RS$resmoke, FUN=mean)
+tapply(X=RS$smoking_pack_years_v1, INDEX=RS$resmoke, FUN=mean, na.rm=TRUE)
+#Average # of cigarettes smoke/day
+tapply(X=RS$rds32_v1, INDEX=RS$resmoke, FUN=mean,na.rm=TRUE)
+#Age started smoking
+tapply(X=RS$rds28_v1, INDEX=RS$resmoke, FUN=mean, na.rm=TRUE)
+#Age stopped smoking
+tapply(X=RS$rds31_v1, INDEX=RS$resmoke, FUN=mean, na.rm=TRUE)
+
+
+#Spirometry data 
+tapply(X=RS$pct_post_fev1_v1, INDEX=RS$resmoke, FUN=mean, na.rm=TRUE)
+tapply(X=RS$pct_post_fev1fvc_v1, INDEX=RS$resmoke, FUN=mean, na.rm=TRUE)
+
+
+```
+
+#calculate duration of smoking
+#linear regression
+```{r}
+#CRP
+crp<-lm(crp_log~factor(RS$resmoke))
+summary(crp)$coefficients
+
+#mucin concentration
+mu<-lm(mucin_log~factor(RS$resmoke))
+summary(mu)$coefficients
+
+
+#Fibrinogen
+fibrin<-lm(fibrin_log~factor(RS$resmoke))
+summary(fibrin)$coefficients
+
+#Soluble TNFa-1
+tnf1a<-lm(tnf1a_log~factor(RS$resmoke))
+summary(tnf1a)$coefficients
+
+#Soluble TNFb-1
+tnf1b<-lm(tnf1b_log~factor(RS$resmoke))
+summary(tnf1b)$coefficients
+
+
+
+```
+
+```{r}
+#Multivariate analysis
+#adjusting for age, cigarette pack-years
+
+CRP_mv<-lm(crp_log~factor(RS$resmoke)+ RS$age_derv_v1 + RS$smoking_pack_years_v1)
+summary(CRP_mv)$coefficients
+
+mucin_mv<-lm(mucin_log~factor(RS$resmoke)+ RS$age_derv_v1 + RS$smoking_pack_years_v1)
+summary(mucin_mv)$coefficients
+
+fibrinogen_mv<-lm(fibrin_log~factor(RS$resmoke)+ RS$age_derv_v1 + RS$smoking_pack_years_v1)
+summary(fibrinogen_mv)$coefficients
+
+tnf1a_mvmv<-lm(tnf1a_log~factor(RS$resmoke)+ RS$age_derv_v1 + RS$smoking_pack_years_v1)
+summary(tnf1a_mvmv)$coefficients
+
+tnf1b_mv<-lm(tnf1b_log~factor(RS$resmoke)+ RS$age_derv_v1 + RS$smoking_pack_years_v1)
+summary(tnf1b_mv)$coefficients 
+```
+
+
+
+## Results
+There was no statistically significant difference in the average number of cigarettes smoked per day between the smoking groups
+Resilient smokers were distinguished from non-resilient smokers by 
+Lower pack years (38.5 pack- years vs 45.15 pack-years, p=0.003)
+Lower mean age at which they stopped smoking cigarettes (49 years vs 52 years, p=0.01)
+
+
+## Discussion
+Resilient smokers have inflammatory biomarkers that are similar to never smokers. This could explain why those with preserved physiology have a lack of symptoms and radiographic findings of COPD.  
+Group 1/Resilient smokers may be an important sub-population to further investigate in the future. In particular to investigate protective and homeostatic biological mechanisms that leads to resilience from cigarette smoke.  Additionally, this population may have different airway epithelial gene expression markers. It would also be interesting to look at endobronchial gene expression and microbiome data. 
+
+The limitations of this study is that SPIROMICS is a biased study, in that smokers volunteered to be in the study which may not be representative of the true smoking population. 
+
+#Bibliography
+* Add a `bibliography` field in the header, defining the path to a `.bib` file. In this example document, this has been set to `bibliography: refs.bib`. You can open the `refs.bib` file in RStudio by clicking its name from the Files panel. It is a text file. Each entry is of the form `@[type]{ ... information }
+* You can copy-paste entries in this format from Google scholar by clicking on the double quote cartoon below an article and then clicking BibTeX
+* In the text add `@ihaka1996r` to show @ihaka1996r, or `[@ihaka1996r]` to show [@ihaka1996r]. Note how the citation is automatically added at the end of the document
